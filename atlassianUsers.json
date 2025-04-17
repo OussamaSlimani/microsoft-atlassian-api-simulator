@@ -1,0 +1,10 @@
+[
+  {
+    "email": "newuser@example.com",
+    "displayName": "New User",
+    "orgId": "{orgId}",
+    "id": 1,
+    "jiraAssigned": true,
+    "confluenceAssigned": true
+  }
+]
