@@ -3,18 +3,14 @@ const fs = require('fs');
 const app = express();
 const port = 3000;
 
-// Middleware to parse JSON body
 app.use(express.json());
 
-// Fake databases (JSON files)
 const microsoftDB = './microsoftUsers.json';
 const atlassianDB = './atlassianUsers.json';
 
-// Simulated API Tokens
 const microsoftApiToken = 'microsoft-fake-api-token';
 const atlassianApiToken = 'atlassian-fake-api-token';
 
-// Middleware to check API token for Microsoft
 const checkMicrosoftAuth = (req, res, next) => {
   const token = req.headers['authorization'];
   if (token === `Bearer ${microsoftApiToken}`) {
@@ -24,7 +20,6 @@ const checkMicrosoftAuth = (req, res, next) => {
   }
 };
 
-// Middleware to check API token for Atlassian
 const checkAtlassianAuth = (req, res, next) => {
   const token = req.headers['authorization'];
   if (token === `Bearer ${atlassianApiToken}`) {
@@ -34,7 +29,6 @@ const checkAtlassianAuth = (req, res, next) => {
   }
 };
 
-// Load the data from the files if they exist
 const loadData = (filePath) => {
   if (fs.existsSync(filePath)) {
     return JSON.parse(fs.readFileSync(filePath));
@@ -42,97 +36,148 @@ const loadData = (filePath) => {
   return [];
 };
 
-// Simulating Microsoft API: Create User
+const saveData = (filePath, data) => {
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+};
+
+// ---------------------- MICROSOFT ---------------------- //
+
+// POST
 app.post('/microsoft/users', checkMicrosoftAuth, (req, res) => {
   const { displayName, mailNickname, userPrincipalName, passwordProfile } = req.body;
-
   if (!displayName || !mailNickname || !userPrincipalName || !passwordProfile) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
-
   const users = loadData(microsoftDB);
   const newUser = {
+    id: users.length + 1,
     displayName,
     mailNickname,
     userPrincipalName,
-    passwordProfile,
-    id: users.length + 1, // Fake ID for the user
+    accountEnabled: true,
+    passwordProfile
   };
-
   users.push(newUser);
-  fs.writeFileSync(microsoftDB, JSON.stringify(users, null, 2));
-
+  saveData(microsoftDB, users);
   res.status(201).json(newUser);
 });
 
-// Simulating Atlassian API: Invite User
+// GET
+app.get('/microsoft/users', checkMicrosoftAuth, (req, res) => {
+  const users = loadData(microsoftDB);
+  res.status(200).json({ value: users });
+});
+
+// PATCH (Update)
+app.patch('/microsoft/users/:id', checkMicrosoftAuth, (req, res) => {
+  const { id } = req.params;
+  let users = loadData(microsoftDB);
+  const index = users.findIndex(u => u.id == id);
+  if (index === -1) return res.status(404).json({ error: 'User not found' });
+
+  users[index] = { ...users[index], ...req.body };
+  saveData(microsoftDB, users);
+  res.status(200).json(users[index]);
+});
+
+// DELETE
+app.delete('/microsoft/users/:id', checkMicrosoftAuth, (req, res) => {
+  const { id } = req.params;
+  let users = loadData(microsoftDB);
+  const index = users.findIndex(u => u.id == id);
+  if (index === -1) return res.status(404).json({ error: 'User not found' });
+
+  const deletedUser = users.splice(index, 1);
+  saveData(microsoftDB, users);
+  res.status(204).send(); // Microsoft Graph returns 204 No Content
+});
+
+// ---------------------- ATLASSIAN ---------------------- //
+
+// POST invitation
 app.post('/atlassian/orgs/:orgId/invitations', checkAtlassianAuth, (req, res) => {
   const { orgId } = req.params;
   const { email, displayName } = req.body.user;
-
   if (!email || !displayName) {
     return res.status(400).json({ error: 'Missing user details' });
   }
-
-  const atlassianUsers = loadData(atlassianDB);
+  const users = loadData(atlassianDB);
   const newUser = {
+    id: users.length + 1,
     email,
     displayName,
     orgId,
-    id: atlassianUsers.length + 1, // Fake ID for the user
+    invited: true
   };
-
-  atlassianUsers.push(newUser);
-  fs.writeFileSync(atlassianDB, JSON.stringify(atlassianUsers, null, 2));
-
+  users.push(newUser);
+  saveData(atlassianDB, users);
   res.status(201).json({ message: 'User invited', user: newUser });
 });
 
-// Simulating adding user to Jira
+// GET invited users
+app.get('/atlassian/orgs/:orgId/invitations', checkAtlassianAuth, (req, res) => {
+  const { orgId } = req.params;
+  const users = loadData(atlassianDB).filter(u => u.orgId === orgId && u.invited);
+  res.status(200).json({ values: users });
+});
+
+// Jira
 app.post('/atlassian/jira/:cloudId/rest/api/3/user', checkAtlassianAuth, (req, res) => {
-  const { cloudId } = req.params;
   const { emailAddress, displayName } = req.body;
-
-  if (!emailAddress || !displayName) {
-    return res.status(400).json({ error: 'Missing user details' });
-  }
-
-  const atlassianUsers = loadData(atlassianDB);
-  const user = atlassianUsers.find((u) => u.email === emailAddress);
-
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
+  const users = loadData(atlassianDB);
+  const user = users.find(u => u.email === emailAddress);
+  if (!user) return res.status(404).json({ error: 'User not found' });
   user.jiraAssigned = true;
-  fs.writeFileSync(atlassianDB, JSON.stringify(atlassianUsers, null, 2));
-
+  saveData(atlassianDB, users);
   res.status(200).json({ message: 'User added to Jira', user });
 });
-
-// Simulating adding user to Confluence
-app.post('/atlassian/confluence/:cloudId/wiki/rest/api/user', checkAtlassianAuth, (req, res) => {
-  const { cloudId } = req.params;
-  const { email, displayName } = req.body;
-
-  if (!email || !displayName) {
-    return res.status(400).json({ error: 'Missing user details' });
-  }
-
-  const atlassianUsers = loadData(atlassianDB);
-  const user = atlassianUsers.find((u) => u.email === email);
-
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
-  user.confluenceAssigned = true;
-  fs.writeFileSync(atlassianDB, JSON.stringify(atlassianUsers, null, 2));
-
-  res.status(200).json({ message: 'User added to Confluence', user });
+app.get('/atlassian/jira/:cloudId/rest/api/3/user/search', checkAtlassianAuth, (req, res) => {
+  const users = loadData(atlassianDB).filter(u => u.jiraAssigned);
+  res.status(200).json(users);
 });
 
-// Start the server
+// Confluence
+app.post('/atlassian/confluence/:cloudId/wiki/rest/api/user', checkAtlassianAuth, (req, res) => {
+  const { email, displayName } = req.body;
+  const users = loadData(atlassianDB);
+  const user = users.find(u => u.email === email);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  user.confluenceAssigned = true;
+  saveData(atlassianDB, users);
+  res.status(200).json({ message: 'User added to Confluence', user });
+});
+app.get('/atlassian/confluence/:cloudId/wiki/rest/api/user', checkAtlassianAuth, (req, res) => {
+  const email = req.query.email;
+  if (!email) return res.status(400).json({ error: 'Missing email query param' });
+  const users = loadData(atlassianDB);
+  const user = users.find(u => u.email === email && u.confluenceAssigned);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.status(200).json(user);
+});
+
+// PUT (Update user - simulated)
+app.put('/atlassian/users/:email', checkAtlassianAuth, (req, res) => {
+  const { email } = req.params;
+  const users = loadData(atlassianDB);
+  const index = users.findIndex(u => u.email === email);
+  if (index === -1) return res.status(404).json({ error: 'User not found' });
+  users[index] = { ...users[index], ...req.body };
+  saveData(atlassianDB, users);
+  res.status(200).json({ message: 'User updated', user: users[index] });
+});
+
+// DELETE (Simulated delete by email)
+app.delete('/atlassian/users/:email', checkAtlassianAuth, (req, res) => {
+  const { email } = req.params;
+  let users = loadData(atlassianDB);
+  const index = users.findIndex(u => u.email === email);
+  if (index === -1) return res.status(404).json({ error: 'User not found' });
+  users.splice(index, 1);
+  saveData(atlassianDB, users);
+  res.status(204).send(); // Simulate Atlassian delete response
+});
+
+// Start server
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+  console.log(`🚀 Fake API Server running at http://localhost:${port}`);
 });
