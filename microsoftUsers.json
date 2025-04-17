@@ -1,32 +1,3 @@
 [
-  {
-    "displayName": "John Doe",
-    "mailNickname": "johndoe",
-    "userPrincipalName": "johndoe@yourdomain.com",
-    "passwordProfile": {
-      "forceChangePasswordNextSignIn": true,
-      "password": "StrongPassword123!"
-    },
-    "id": 1
-  },
-  {
-    "displayName": "John Doe",
-    "mailNickname": "johndoe",
-    "userPrincipalName": "johndoe@yourdomain.com",
-    "passwordProfile": {
-      "forceChangePasswordNextSignIn": true,
-      "password": "StrongPassword123!"
-    },
-    "id": 2
-  },
-  {
-    "displayName": "John Doe",
-    "mailNickname": "johndoe",
-    "userPrincipalName": "johndoe@yourdomain.com",
-    "passwordProfile": {
-      "forceChangePasswordNextSignIn": true,
-      "password": "StrongPassword123!"
-    },
-    "id": 3
-  }
+
 ]

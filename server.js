@@ -48,7 +48,13 @@ app.post('/microsoft/users', checkMicrosoftAuth, (req, res) => {
   if (!displayName || !mailNickname || !userPrincipalName || !passwordProfile) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
+
   const users = loadData(microsoftDB);
+  const existing = users.find(u => u.userPrincipalName === userPrincipalName);
+  if (existing) {
+    return res.status(409).json({ error: 'User with this userPrincipalName already exists' });
+  }
+
   const newUser = {
     id: users.length + 1,
     displayName,
@@ -61,6 +67,7 @@ app.post('/microsoft/users', checkMicrosoftAuth, (req, res) => {
   saveData(microsoftDB, users);
   res.status(201).json(newUser);
 });
+
 
 // GET
 app.get('/microsoft/users', checkMicrosoftAuth, (req, res) => {
@@ -101,7 +108,13 @@ app.post('/atlassian/orgs/:orgId/invitations', checkAtlassianAuth, (req, res) =>
   if (!email || !displayName) {
     return res.status(400).json({ error: 'Missing user details' });
   }
+
   const users = loadData(atlassianDB);
+  const existing = users.find(u => u.email === email);
+  if (existing) {
+    return res.status(409).json({ error: 'User with this email already exists' });
+  }
+
   const newUser = {
     id: users.length + 1,
     email,
@@ -113,6 +126,7 @@ app.post('/atlassian/orgs/:orgId/invitations', checkAtlassianAuth, (req, res) =>
   saveData(atlassianDB, users);
   res.status(201).json({ message: 'User invited', user: newUser });
 });
+
 
 // GET invited users
 app.get('/atlassian/orgs/:orgId/invitations', checkAtlassianAuth, (req, res) => {
